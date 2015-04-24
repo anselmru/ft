@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# PROVIDE: DAEMON_NAME
+# REQUIRE: DAEMON
+# KEYWORD: jail
+. /etc/rc.subr
+
+name="DAEMON_NAME"
+pidfile="/var/run/${name}.pid"
+required_files="/usr/local/etc/${name}.conf"
+exec_directory="/usr/local/bin"
+
+export pidfile=$pidfile
+export conffile=$required_files
+
+command="${exec_directory}/BINARY_NAME"
+
+rcvar=`set_rcvar`
+load_rc_config $name
+run_rc_command "$1"
