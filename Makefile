@@ -1,14 +1,14 @@
-CC      = g++
+CC      = clang
 CPP     = $(CC)
 CXX     = $(CC)
 LINK    = $(CC)
 
 RM      = rm -f
-CFLAGS += -I/usr/local/include -O2 -DNDEBUG
-LFLAGS += -L/usr/local/lib -lpthread -lboost_regex -lmd
+CFLAGS += -I/usr/local/include -I/usr/local/include/libxml2 -O2 -DNDEBUG
+LFLAGS += -L/usr/local/lib -lpthread -lmd -lstdc++ -lxml2
 BIN     = k104
 RC      = k104
-SRC     = main.cpp tcpclient.cpp modbustcp.cpp udp.cpp conf.cpp
+SRC     = main.cpp tcpclient.cpp modbustcp.cpp udp.cpp xml.cpp event.cpp
 HDRS    = 
 OBJ_CPP = $(SRC:.cpp=.o)
 OBJ     = $(OBJ_CPP:.c=.o)

@@ -2,7 +2,7 @@
 
 # PROVIDE: DAEMON_NAME
 # REQUIRE: DAEMON
-# KEYWORD: jail
+# KEYWORD: nojail shutdown
 . /etc/rc.subr
 
 name="DAEMON_NAME"
@@ -14,7 +14,13 @@ export pidfile=$pidfile
 export conffile=$required_files
 
 command="${exec_directory}/BINARY_NAME"
+start_postcmd="${name}_limit"
+DAEMON_NAME_limit() {
+  pid=`cat ${pidfile}`
+  rctl -a process:$pid:pcpu:deny=5
+  rctl -l process:$pid
+}
 
-rcvar=`set_rcvar`
+rcvar=${name}_enable
 load_rc_config $name
 run_rc_command "$1"

@@ -9,4 +9,4 @@ Usage: ./k104h2 host port register
        reg  - number of register
 
 
-GNU GPL
+GNU GPLv3

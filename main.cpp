@@ -9,7 +9,7 @@
 #include <stdlib.h> //atoi
 #include <libgen.h> //basename
 #include "modbustcp.h"
-#include "conf.h"
+#include "xml.h"
 
 void help();
 void err(const char* msg);
@@ -44,8 +44,7 @@ int main(int argc, char* argv[])
     return 1;
   }
   
-  Conf cfg(conffile, "#");
-  if(!cfg.exist()) {
+  if(!XML::exist(conffile)) {
     err("Config file not found ");
     return 1;
   }
@@ -112,27 +111,14 @@ void term(int signum) {
 }
 
 void mainloop() {
-  Conf cfg(conffile, "#");
-	const char *host = cfg.readString("tcp", "host");
-  const int port   = cfg.readInteger("tcp", "port");
-  const int wait   = cfg.readInteger("tcp", "wait", 1000);
-  const int rate   = cfg.readInteger("general", "rate", 10);
-  const Conf::Section *s = cfg.readSection("command");
+  XML cfg(conffile);
+  const int rate  = cfg["data"]["rate"].to_int(10);
   
   while(1) {
-  	
- 	  ModbusTCP tcp(host, port);
-		tcp.setWait(wait);
-		
-		Conf::Section::const_iterator i = s->begin();
-		for(; i!=s->end(); i++) {
-			tcp << *i;  // insert commands
-		}
-  	
+ 	  ModbusTCP tcp(cfg); 	
   	tcp.connect();
   	tcp.disconnect();
   	sleep(rate);
-  	//printf("sleep %d\n", rate);
   }
 }
 
@@ -160,9 +146,9 @@ void help() {
 }
 
 void vers() {
-  printf("k104d-1.0, anselm.ru, 2012-12-03.\n");
-  printf("Asks device k104.\n");
-  printf("License GNU GPL.\n");
+  printf("k104 v1.1, anselm.ru, 2017-12-26\n");
+  printf("Asks device k104\n");
+  printf("GNU GPLv3\n");
 }
 
 void err(const char* msg) {
@@ -172,31 +158,18 @@ void err(const char* msg) {
 
 int main1(int argc, char* argv[])
 {
-  Conf cfg("k104.conf", "#");
-  if(!cfg.exist()) {
+  if(!XML::exist("k104.conf")) {
     err("Config file not found ");
     return 1;
   }
 
-  const char *host = cfg.readString("tcp", "host");
-  const int port   = cfg.readInteger("tcp", "port");
-  const int wait   = cfg.readInteger("tcp", "wait", 1000);
-  const int rate   = cfg.readInteger("general", "rate", 10);
-  const Conf::Section *s = cfg.readSection("command");
-  
-
-  ModbusTCP tcp(host, port);
-  tcp.setWait(wait);
-	
-	Conf::Section::const_iterator i = s->begin();
-	for(; i!=s->end(); i++) {
-		tcp << *i;  // insert commands
-	}  
-
+  XML cfg("k104.conf");  
+  ModbusTCP tcp(cfg);
+ 
 	if(tcp.connect() ) {
 		//sleep(3);  
-		tcp.disconnect();
-		
+		tcp.disconnect();		
 	}
+	
 	return 0;
 }

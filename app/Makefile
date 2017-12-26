@@ -1,8 +1,8 @@
-CPP     = g++
-LINK    = g++
+CPP     = clang
+LINK    = $(CPP)
 RM      = rm -f
 CFLAGS += -I/usr/local/include -O2 -DNDEBUG
-LFLAGS += -L/usr/local/lib -lpthread
+LFLAGS += -L/usr/local/lib -lpthread -lstdc++
 BIN     = k104h2
 HDRS    = tcpclient.h
 SRC     = main.cpp tcpclient.cpp

@@ -1,6 +1,7 @@
 #pragma once
 #include "tcpclient.h"
 #include "udp.h"
+#include "xml.h"
 
 #include <list>
 #include <map>
@@ -30,13 +31,13 @@ typedef struct Query {
 		size,         // размер параметра (либо в регистрах - для функций 3 и 4, либо в битах - для функций 1 и 2)
 		length;       // размер в байтах всего запроса MODBUS-TCP
 	char data[20];  // данные запроса MODBUS-TCP
-};
+} Query;
 
 
 class ModbusTCP : public TCPclient
 {
 public:
-  ModbusTCP(const char *host, const int port);
+  ModbusTCP(const Node&);
   virtual ~ModbusTCP();
   bool connect();
    
@@ -50,17 +51,20 @@ private:
   typedef unsigned short WORD;
   typedef unsigned char BYTE;
 
-  int d_timeout, d_rate, d_hour;
+  //int d_timeout, d_rate, d_hour;
   
   std::map<int, Query> d_query;
   
-  UDP *udp;
-  const char *password;
+  //UDP *udp;
+  //const char *password;
   typedef std::list<OPC_ITEM> Items;
   Items d_items;
   
-  bool send_datagram();
+  //void debug(Query);
+  //void debug(OPC_ITEM);
   
-  void debug(Query);
-  void debug(OPC_ITEM);
+  
+  bool send_datagram();
+  const char* UDP_PASSWORD;       // пароль для доступа к службам хранения 
+  UDP d_udp;                      // список udp-серверов хранения
 };

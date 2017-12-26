@@ -1,11 +1,12 @@
 #include "modbustcp.h"
-#include "conf.h"
+#include "log.h"
 #include <md5.h>
 
 #include <syslog.h>
 #include <stdio.h>
 #include <string.h>  //strlen strdup strrchr
 #include <sys/time.h>
+#include <stdlib.h>
 
 enum VARENUM {
   VT_EMPTY=0,
@@ -18,27 +19,59 @@ enum VARENUM {
 #define CHECKSUM_LEN 32
 #define OPC_ITEM_LEN sizeof(OPC_ITEM)
 
-
-
-ModbusTCP::ModbusTCP(const char *host, const int port)
-  : TCPclient(host, port)
+ModbusTCP::ModbusTCP(const Node& cfg)
+  : TCPclient(cfg["data"]["socket"]["host"].c_str(), cfg["data"]["socket"]["port"].to_int())
+  , UDP_PASSWORD(NULL)
 {
-  Conf cfg(0, "#");
-  const char *to       = cfg.readString("udp", "to");
-  const char *net      = cfg.readString("udp", "net");
-  password             = cfg.readString("udp", "password");
-  const int udp_port   = cfg.readInteger("udp", "port");
-  const int size       = cfg.readInteger("udp", "size", 255);
-  const int wait       = cfg.readInteger("udp", "wait", 100);
-  d_hour               = cfg.readInteger("general", "hour", 5);
+  const int   wait  = cfg["data"]["socket"]["rcvtimeo"].to_int(1000);
+  const int   rate  = cfg["data"]["rate"].to_int(10);
+  UDP_PASSWORD      = cfg["store"]["password"].strdup("*****");
   
-  //syslog(LOG_ERR, "%s %s %s\n", to, net, password);
-  udp = new UDP(net, udp_port, size, wait, to);
+  Node::CPair ret   = cfg["data"].equal_range("param");
+  setWait(wait);
+  
+  Node::const_iterator I = ret.first;
+  for(; I!=ret.second; ++I) {
+    const Node& param = I->second;
+    //printf("param id='%d' command='%s'\n", param["id"].to_int(), param["command"].c_str());
+    ModbusTCP::Pair cmd = std::make_pair(param["id"].to_string(), param["command"].to_string());
+    *this << cmd;  // insert commands
+  }
+  
+  ret = cfg.equal_range("store");
+  I = ret.first;
+  for(; I!=ret.second; ++I) {
+    const Node& data = I->second;
+    
+    Node::CPair ret2 = data.equal_range("socket");
+    Node::const_iterator J=ret2.first;
+    for(; J!=ret2.second; ++J) {
+      Node sock = J->second;
+      Node::const_iterator K = data.begin(); // перебираем все свойства ёмкости data
+      for(; K!=data.end(); ++K) {
+        const string key = K->first;
+        if(key.compare("comment")!=0 && sock[key].to_string().empty() && !K->second.to_string().empty()) {
+          sock[key] = K->second; // наследуем свойство родителя
+        }
+      }
+      //string iid = sock["host"].to_string()+":"+sock["port"].to_string();
+      d_udp.add_addr(sock["host"].c_str(), sock["port"].to_int());
+      //d_stores[ iid ] = sock;
+    }
+  }
+  
+  if(d_udp.empty()) {
+    warning("empty section store in conf-file");
+    //d_error = true;
+    return;
+  }
+
 }
 
 ModbusTCP::~ModbusTCP()
 {
-  delete udp;
+  //if(udp) delete udp;
+  if(UDP_PASSWORD) delete [] UDP_PASSWORD;
 }
 
 void ModbusTCP::read(const char *buf, const int size) // заполняет d_item
@@ -60,7 +93,7 @@ void ModbusTCP::read(const char *buf, const int size) // заполняет d_it
   
   timeval tv;
 	gettimeofday(&tv, NULL);
-  tv.tv_sec += d_hour*3600;
+  //tv.tv_sec += d_hour*3600;
   
   
   int id  = (buf[0]<<8) + (buf[1]&0xff);
@@ -168,7 +201,7 @@ bool ModbusTCP::send_datagram()
   char *buf   = (char*)malloc(size), *const buf0 = buf; //buf0 - указатель на начало
   
   memset(buf, 0, size); //очистим буфер перед новым использованием
-  strcpy(buf, password);//запишем пароль
+  strcpy(buf, UDP_PASSWORD);//запишем пароль
   buf += PASSWORD_LEN;
 
   Items::iterator i = d_items.begin();   
@@ -183,7 +216,8 @@ bool ModbusTCP::send_datagram()
     char hash[33];
     MD5Data(buf0, len, hash);
     strncpy(buf, hash, CHECKSUM_LEN); //memcpy(buf, hash, CHECKSUM_LEN);
-    cool = udp->send(buf0, len+CHECKSUM_LEN);
+    //cool = udp->send(buf0, len+CHECKSUM_LEN);
+    cool = d_udp.send(buf0, len+CHECKSUM_LEN);
   }
 
   if(buf0) free(buf0);
@@ -191,8 +225,7 @@ bool ModbusTCP::send_datagram()
   return cool;
 }
 
-
-void ModbusTCP::debug(Query q)
+/*void ModbusTCP::debug(Query q)
 {
 	printf("Query: id=%d device=%d function=%d reg=%d count=%d size=%d length=%d", q.id, q.device, q.function, q.reg, q.count, q.size, q.length);
 	printf(" data=[%d %d %d %d %d %d %d %d %d %d %d %d]\n", q.data[0], q.data[1], q.data[2], q.data[3], q.data[4], q.data[5], q.data[6], q.data[7], q.data[8], q.data[9], q.data[10], q.data[11]);
@@ -204,4 +237,6 @@ void ModbusTCP::debug(OPC_ITEM a)
 		printf("OPC_ITEM: id=%d value=%f\n", a.id, a.data.f);
 	else
 		printf("OPC_ITEM: id=%d value=%d\n", a.id, a.data.i);
-}
+}*/
+
+
