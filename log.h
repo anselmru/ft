@@ -1,5 +1,5 @@
 /***********************************************************************************
-                         anselm.ru [2016-10-25] GNU GPL
+                         anselm.ru [2021-02-24] GNU GPL
 ***********************************************************************************/
 #ifndef LOG_H
 #define LOG_H
@@ -15,25 +15,23 @@
 #include <string.h> //strlen
 #include <stdlib.h> //malloc
 
-#define debug1 debug
+#define debug warning
 
-#if DEBUG==1
-#define debug(A) A
-#define debug2(A)
-#define debug3(A)
-#elif DEBUG==2
-#define debug(A) A
-#define debug2(A) A
-#define debug3(A)
-#elif DEBUG==3
-#define debug(A) A
-#define debug2(A) A
-#define debug3(A) A
-#else
-#define debug(A)
-#define debug2(A)
-#define debug3(A)
-#endif
+#define debug1(...)     if(DEBUG>=1) debug(__VA_ARGS__)
+#define debug2(...)     if(DEBUG>=2) debug(__VA_ARGS__)
+#define debug3(...)     if(DEBUG>=3) debug(__VA_ARGS__)
+
+#define error1(...)     if(DEBUG>=1) error(__VA_ARGS__)
+#define error2(...)     if(DEBUG>=2) error(__VA_ARGS__)
+#define error3(...)     if(DEBUG>=3) error(__VA_ARGS__)
+
+#define warning1(...)   if(DEBUG>=1) warning(__VA_ARGS__)
+#define warning2(...)   if(DEBUG>=2) warning(__VA_ARGS__)
+#define warning3(...)   if(DEBUG>=3) warning(__VA_ARGS__)
+
+#define print_bin1(...) if(DEBUG>=1) print_bin(__VA_ARGS__)
+#define print_bin2(...) if(DEBUG>=2) print_bin(__VA_ARGS__)
+#define print_bin3(...) if(DEBUG>=3) print_bin(__VA_ARGS__)
 
 
 extern const char* SYSLOGNAME;

@@ -1,5 +1,5 @@
 /***********************************************************************************
-                         anselm.ru [2017-10-17] GNU GPLv3
+                         anselm.ru [2020-12-16] GNU GPLv3
 ***********************************************************************************/
 #include "xml.h"
 //#include <iostream>
@@ -7,6 +7,8 @@
 #include <libxml/tree.h> //http://www.xmlsoft.org/examples/xpath2.c
 #include <libxml/parser.h>
 #include <libxml/xpathInternals.h>
+//#include <libxml/xmlmemory.h>
+//#include <libxml/xpath.h>
 
 #ifndef LOG_H
 #define warning printf
@@ -29,14 +31,48 @@ trim(string s) {
 const Node&
 Node::NONE = Node();
 
-Node&
-Node::append(const string& key, const string& val) {//emplace
-  Node n;
-  n.d_value = trim(val);
-  iterator I = multimap<string, Node>::insert( pair<string, Node>(trim(key), n) );
-  return I->second;
+Node& 
+Node::operator=(const string& s) {
+  d_value = s;
+  if(d_node)
+    xmlNodeSetContent(d_node, BAD_CAST s.c_str() );
+    
+  return *this;
 }
 
+Node& 
+Node::assign(xmlNodePtr node) {
+  d_node = node;
+  const string key = trim(string((char*) node->name));
+  xmlChar *content = xmlNodeGetContent(node);
+  d_value = trim(string((char*) content));
+  xmlFree(content);
+  
+  iterator I = insert( pair<string, Node>(key, Node(d_value)) );
+  Node& n = I->second;
+  n.d_node = node;
+  //warning("%s => %s\n", I->first.c_str(), I->second.c_str());
+  
+  xmlAttr *attr = node->properties;
+  while( attr ) { // пробежимся по атрибутам (здесь нет рекурсии)
+    const string key = trim(string((char*) attr->name));
+    const string val = trim(string((char*) attr->children->content));
+    iterator I       = n.insert( pair<string, Node>(key, Node(val)) );
+    I->second.d_attr = attr;
+    //warning("%s -> %s\n", key.c_str(), val.c_str());
+    attr = attr->next;
+  }
+  
+  xmlNode* cur = node->xmlChildrenNode;
+  while(cur) { // пробежимся по потомкам (здесь есть рекурсия)
+    const string key = trim(string((char*) cur->name));
+    if( key != "text" && key != "comment" ) { // игнорируем поле text - оно системное для библиотеки libxml2
+      n.assign(cur); //рекурсия
+    }
+    cur = cur->next;
+  }
+  return *this;
+}
 
 const Node&
 Node::operator[](const string& key) const {
@@ -50,10 +86,27 @@ Node::operator[](const string& key) const {
 Node&
 Node::operator[](const string& key) {
   iterator I = find(key);
-  if(I!=end())
+  if(I != end())
     return I->second;
-  else
-    return append(key);
+  else {
+    I = begin();
+    xmlNodePtr parent = NULL;
+    if(I!=end() && I->second.d_node) 
+      parent = I->second.d_node->parent;
+    else if(d_node && d_node->parent)
+      parent = d_node->parent;
+    else parent = d_node;
+    
+    //warning("%s not find (%p)\n", key.c_str(), parent);
+    //xmlNewProp(d_node, BAD_CAST "attr", BAD_CAST "yes");
+    //xmlSetProp(d_node, BAD_CAST "attr", BAD_CAST "no");
+    xmlNodePtr x = xmlNewChild(parent, NULL, BAD_CAST key.c_str(), BAD_CAST "");
+    //I = insert( pair<string, Node>(key, Node("",x)) );
+    I = insert( pair<string, Node>(key, Node()) );
+    I->second.d_node = x;
+    //I->second.assign(x);
+    return I->second; // возвращатся узел
+  }
 }
   
 void
@@ -70,20 +123,25 @@ Node::dump(int level) const {
 
 Node
 Node::index(const char* id) {
-  Node x;
+  Node n;
   
   Node::iterator I = begin();
   for(; I!=end(); I++) {
     string val = I->second[id];
-    if(!val.empty()) x[val] = I->second;
+    if(!val.empty()) n[val] = I->second;
   }
   
-  return x;
+  return n;
 }
 
-unsigned wchar_t makeword(char a, char b) {
-  return (unsigned wchar_t)((a&0xff)<<8)+(unsigned wchar_t)(b&0xff);
+/*unsigned wchar_t makeword(char a, char b) {
+  return ((unsigned wchar_t)((a&0xff)<<8));//+((unsigned wchar_t)(b&0xff));
+}*/
+
+wchar_t makeword(char a, char b) {
+  return (wchar_t)((a&0xff)<<8)+(wchar_t)(b&0xff);
 }
+
 
 const wchar_t*
 Node::to_utf16(const char* defaults) {
@@ -203,43 +261,44 @@ Node::to_xml_without_attr() const {
 //void xml_StructuredErrorFunc(void * userData, xmlErrorPtr error) { //xmlResetError(error);}
 
 XML::XML(const char* FILENAME, const char* XPATH)//: Node()
-: doc(NULL)
-, xpathCtx(NULL) {
+: d_doc(NULL)
+, d_ctx(NULL) {  
+  init();
+  d_name = FILENAME;
+  
   struct stat st;
   if(stat(FILENAME, &st) == -1) {
-    warning("Error: file not exist \"%s\"\n", FILENAME);
-    return;
+    warning("Warning: file not exist \"%s\"\n", FILENAME);
+    d_doc = xmlNewDoc(BAD_CAST "1.0");
+    xmlNodePtr root_node = xmlNewNode(NULL, BAD_CAST "root");
+    xmlDocSetRootElement(d_doc, root_node);
+  }
+  else {
+    d_doc = xmlParseFile(FILENAME); // Load XML document
   }
   
-  xmlInitParser();
-  //xmlSetGenericErrorFunc(NULL,  xml_GenericErrorFunc);
-  //xmlSetStructuredErrorFunc(NULL, xml_StructuredErrorFunc);
-  //LIBXML_TEST_VERSION
-  
-  doc = xmlParseFile(FILENAME); // Load XML document
-  if(doc == NULL) {
+  if(d_doc == NULL) {
     warning("Error: unable to parse file \"%s\"\n", FILENAME);
     return;
   }
-
+  
+  //set();
+  
   init(XPATH);
 }
          
 XML::XML(const char* BUFFER, int size, const char* XPATH)
-: doc(NULL)
-, xpathCtx(NULL) {
+: d_doc(NULL)
+, d_ctx(NULL) {
   if(size <= 0) {
     warning("Error: empty string\n");
     return;
   }
   
-  xmlInitParser();
-  //xmlSetGenericErrorFunc(NULL,  xml_GenericErrorFunc);
-  //xmlSetStructuredErrorFunc(NULL, xml_StructuredErrorFunc);
-  //LIBXML_TEST_VERSION
+  init();
     
-  doc = xmlParseMemory(BUFFER, size); // Load XML document
-  if(doc == NULL) {
+  d_doc = xmlParseMemory(BUFFER, size); // Load XML document
+  if(d_doc == NULL) {
     warning("error: unable to parse string \"%s\"\n", BUFFER);
     return;
   }
@@ -248,20 +307,17 @@ XML::XML(const char* BUFFER, int size, const char* XPATH)
 }
 
 XML::XML(const string& BUFFER, const char* XPATH)
-: doc(NULL)
-, xpathCtx(NULL) {
+: d_doc(NULL)
+, d_ctx(NULL) {
   if(BUFFER.size() == 0) {
     warning("Error: empty string\n");
     return;
   }
   
-  xmlInitParser();
-  //xmlSetGenericErrorFunc(NULL,  xml_GenericErrorFunc);
-  //xmlSetStructuredErrorFunc(NULL, xml_StructuredErrorFunc);
-  //LIBXML_TEST_VERSION
+  init();
 
-  doc = xmlParseMemory(BUFFER.c_str(), BUFFER.size()); // Load XML document
-  if(doc == NULL) {
+  d_doc = xmlParseMemory(BUFFER.c_str(), BUFFER.size()); // Load XML document
+  if(d_doc == NULL) {
     warning("Error: unable to parse string \"%s\"\n", BUFFER.c_str());
     return;
   }
@@ -270,16 +326,24 @@ XML::XML(const string& BUFFER, const char* XPATH)
 }
 
 void
+XML::init() const {
+  xmlInitParser();
+  //xmlSetGenericErrorFunc(NULL,  xml_GenericErrorFunc);
+  //xmlSetStructuredErrorFunc(NULL, xml_StructuredErrorFunc);
+  LIBXML_TEST_VERSION
+}
+
+void
 XML::init(const char* XPATH) {
   // Create xpath evaluation context
-  xpathCtx = xmlXPathNewContext(doc);
-  if(xpathCtx == NULL) {
+  d_ctx = xmlXPathNewContext(d_doc);
+  if(d_ctx == NULL) {
     warning("Error: unable to create new XPath context\n");
     return;
   }
   
   if(XPATH==NULL) {// получим корневой элемент
-    xmlNode *root = xmlDocGetRootElement(doc);
+    xmlNode *root = xmlDocGetRootElement(d_doc);
     string s  = (const char*)root->name;//"/";
     s = "/" + s + "/*";
     *((Node*)this) = xpath(s.c_str());
@@ -290,11 +354,12 @@ XML::init(const char* XPATH) {
 }
 
 XML::~XML() {
-  if(xpathCtx) xmlXPathFreeContext(xpathCtx);
-  if(doc) {
-    xmlFreeDoc(doc);
+  if(d_ctx) xmlXPathFreeContext(d_ctx);
+  if(d_doc) {
+    xmlFreeDoc(d_doc);
     xmlCleanupParser();
   }
+  //xmlMemoryDump();
 }
 
 bool
@@ -311,7 +376,7 @@ XML::xpath(const char* XPATH) const {
   const xmlChar * xpathExpr = BAD_CAST XPATH;
   
   // Evaluate xpath expression
-  xmlXPathObjectPtr xpathObj = xmlXPathEvalExpression(xpathExpr, xpathCtx);
+  xmlXPathObjectPtr xpathObj = xmlXPathEvalExpression(xpathExpr, d_ctx);
   if(xpathObj == NULL) {
     warning("Error: unable to evaluate xpath expression \"%s\"\n", xpathExpr);
     return mm;
@@ -323,8 +388,8 @@ XML::xpath(const char* XPATH) const {
   for(int i = 0; i < size; i++) {
     xmlNode *node = nodes->nodeTab[i];
     //warning("name->%s\n", node->name);
-    fill(node, mm);    
-    if (node->type != XML_NAMESPACE_DECL) node = NULL;//??
+    mm.assign(node);
+    //if (node->type != XML_NAMESPACE_DECL) node = NULL;//??
   }
   
   xmlXPathFreeObject(xpathObj);
@@ -333,25 +398,21 @@ XML::xpath(const char* XPATH) const {
 }
 
 void
-XML::fill(xmlNode *node, Node &mp) const {  
-  xmlChar *content = xmlNodeGetContent(node);
-  Node &mc = xmlChildElementCount(node)==0 ? mp.append((char*)node->name, (char*)content) /*TODO trim*/: mp.append((char*)node->name);
-  xmlFree(content);
+XML::save() const {
+  //xmlSaveFileEnc(d_name.c_str(), d_doc, "UTF-8");
+  xmlSaveFormatFileEnc(d_name.c_str(), d_doc, "UTF-8", 1); // "-" stdout
+}
+
+void
+XML::set() {   
+  xmlNodePtr root_node = xmlDocGetRootElement(d_doc);
+  xmlNodePtr node = xmlNewChild(root_node, NULL, BAD_CAST "node1", BAD_CAST "content of node 1");
+  xmlNewProp(node, BAD_CAST "attribute", BAD_CAST "yes");
+  xmlSetProp(node, BAD_CAST "attribute", BAD_CAST "no");
   
-  xmlNode* cur = node->xmlChildrenNode;
-  while(cur) { // пробежимся по потомкам
-    char *name = (char*) cur->name;
-    
-    if(strcmp(name, "text")!=0) { // игнорируем это поле text - оно системное для библиотеки libxml2
-      //xmlChar* path = xmlGetNodePath(cur); // x-путь узла
-      fill(cur, mc);
-    }
-    cur = cur->next;
-  }
-    
-  xmlAttr *attr = node->properties;
-  while( attr ) { // пробежимся по атрибутам
-    mc.append((char*)attr->name, (char*)attr->children->content);//TODO trim
-    attr = attr->next;
-  }
+  node = xmlNewNode(NULL, BAD_CAST "node4");
+  xmlNodePtr node1 = xmlNewText(BAD_CAST "other way to create content (which is also a node)");
+  xmlNodeSetContent(node1, (xmlChar*)"Other Content");    
+  xmlAddChild(node, node1);
+  xmlAddChild(root_node, node);
 }
