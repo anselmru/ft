@@ -10,7 +10,7 @@ LINK    = $(CC)
 
 RM      = rm -f
 CFLAGS += -I/usr/local/include/libxml2 \
-          -std=c++11 -std=gnu++11 \
+          -std=c++14 -std=gnu++14 \
           -DSYSLOG -DDEBUG=0 -DDB_DIR="\"$(DBDIR)\""
 LFLAGS += -L/usr/local/lib -lpthread -lstdc++ -lxml2 -lmd
 BIN     = ft

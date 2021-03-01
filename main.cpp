@@ -4,9 +4,9 @@
 #include "dem.h"
 #include "xml.h"
 #include "dev.h"
+#include "file.h"
 
-
-#define VERSION     "ft/tcp-2.0, anselm.ru [2021-02-26]"
+#define VERSION     "ft/tcp-2.1, anselm.ru [2021-03-01]"
 #define DESCRIPTION "Get data from TEKON by proto FT1.2 over TCP"
 #define LICENSE     "GNU GPLv3"
 #define HELP        "Usage: %s [-v|-h] [--config=file.conf] [--day=XXXX-XX-XX|--hour='XXXX-XX-XX XX:XX']\n" \
@@ -17,12 +17,15 @@
                     "  --hour          : put the hour for manual getting\n" \
                     "  --config        : put the config for manual getting\n"
 
+                    
+extern const char *__progname;
+                    
 int
 main( int argc, char *argv[], char *envp[] ) {
   const char *APPNAME  = strdup(basename(argv[0]));
   const char *CONFFILE = NULL;
   const char *PIDFILE  = NULL;
-  const char *FILTER   = NULL;
+  const char *FILTER   = NULL; 
   
   for(int i=1; i<argc; i++) {
     if( strncmp(argv[i], "--config=", 9)==0) {

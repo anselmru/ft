@@ -23,6 +23,7 @@ DAEMON_NAME_limit() {
 
 export pidfile=$pidfile
 export config=$config
+export daemon="DAEMON_NAME"
 
 rcvar=${name}_enable
 load_rc_config $name

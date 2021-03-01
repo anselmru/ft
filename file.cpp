@@ -1,5 +1,7 @@
 /***********************************************************************************
-                         anselm.ru [2020-08-04] GNU GPL
+*              Облегчённое создание, удаление, поиск и чтение файлов               *
+*                       с шаблонными именами в нужной папке.                       *
+*                                                          anselm.ru [2021-03-01]  *
 ***********************************************************************************/
 #include "file.h"
 #include <fnmatch.h>
@@ -9,19 +11,30 @@
 #include <fstream>
 #include <stdlib.h> // free
 
-#define SUFFIX "%Y%m%d%H%M%S.xml"
 
-const char * g_pattern = NULL;
+extern const char *__progname;
+
+using namespace std;
+
+
+const char*  File::PREFIX       = getenv("daemon") ? getenv("daemon") : __progname;
+const char*  File::SUFFIX_FIND  = "*.xml";                 // при поиске более общий шаблон
+const char*  File::SUFFIX_SAVE  = "%Y%m%d%H%M%S.xml";      // при записи более частный шаблон
+const string File::PATTERN_FIND = string(File::PREFIX).append("-").append(File::SUFFIX_FIND).c_str();
+
+File::File(const char* dir)
+:d_dir(dir) {
+  if(d_dir[d_dir.size()-1]!='/') d_dir.append("/");
+}
 
 int
 select(const struct dirent *d) {
-  return 0==fnmatch(g_pattern, d->d_name, 0);
+  return 0==fnmatch(File::PATTERN_FIND.c_str(), d->d_name, 0);
 }
 
 bool
 File::find() {
   struct dirent **namelist = NULL;
-  g_pattern = d_pattern.c_str(); //TODO слабое место
   int n = scandir(d_dir.c_str(), &namelist, select, alphasort);
   if(n > 0) {
     d_file = namelist[n-1]->d_name;
@@ -35,8 +48,8 @@ File::find() {
 }
 
 void
-File::save(const std::string& xml) const {
-  std::string format = d_dir + SUFFIX;
+File::save(const string& xml) const {
+  string format = string(d_dir).append(PREFIX).append("-").append(SUFFIX_SAVE);;
   
   time_t t = time(NULL);
   tm m;
@@ -44,19 +57,19 @@ File::save(const std::string& xml) const {
   
   char buf[100];
   strftime(buf, 100, format.c_str(), &m);
-  std::string file_name =  buf;
+  string file_name =  buf;
   
-  std::ofstream out(file_name.c_str());
+  ofstream out(file_name.c_str());
   out.write(xml.c_str(), xml.size());
   out.close();
 }
 
-std::string
+string
 File::read() const {
-  std::string s;  
+  string s;  
   if(d_file.empty()) return s;
   
-  std::ifstream in( (d_dir+d_file).c_str() );
+  ifstream in( (d_dir+d_file).c_str() );
   getline(in, s, '\0'); //getline(f, s, (char)0);
   in.close();
   return s;
@@ -71,9 +84,9 @@ File::rm() {
   return ret;
 }
 
-std::string
+string
 File::next() {
-  std::string s;
+  string s;
   
   if(!find()) return s;
   s = read();

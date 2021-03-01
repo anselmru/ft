@@ -7,6 +7,7 @@
 #pragma once
 #include "ft.h"
 #include "xml.h"
+#include <string>
 
 class Dev: public FT
 {
@@ -26,5 +27,6 @@ private:
   
   Node d_params;                       // список запрашиваемых параметров
   Node d_stores;
+  //std::string DB_PATTERN;
   long d_timeout_recv;
 };

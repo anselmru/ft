@@ -293,7 +293,7 @@ Dev::force(const char* filter) {
 
 void
 Dev::check_file() {
-  File f(DB_DIR, DB_PATTERN);
+  File f(DB_DIR);
   
   if(!f.find()) return;
   

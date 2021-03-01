@@ -1,5 +1,6 @@
 /***********************************************************************************
-                         anselm.ru [2021-02-24] GNU GPL
+*                                 Логирование.                                     *
+*                                                         anselm.ru [2021-02-26]   *
 ***********************************************************************************/
 #ifndef LOG_H
 #define LOG_H
@@ -34,7 +35,7 @@
 #define print_bin3(...) if(DEBUG>=3) print_bin(__VA_ARGS__)
 
 
-extern const char* SYSLOGNAME;
+extern const char *__progname;
 
 inline void
 warning(const char* format, ...) {
@@ -49,13 +50,12 @@ warning(const char* format, ...) {
     vsnprintf(s, len, format, paramList);
   }
   va_end(paramList);
-  
+    
 #ifdef SYSLOG
-  //if(SYSLOGNAME) {
-    openlog(SYSLOGNAME, 0, LOG_USER);
-    syslog(LOG_NOTICE, "%s", s);
-    closelog();
-  //}
+  const char* SYSLOGNAME = getenv("daemon") ? getenv("daemon") : __progname;
+  openlog(SYSLOGNAME, 0, LOG_USER);
+  syslog(LOG_NOTICE, "%s", s);
+  closelog();
 #else
   printf("%s\n", s);
 #endif
@@ -79,16 +79,15 @@ error(const char* format, ...) {
     vsnprintf(s, len, format, paramList);
   }
   va_end(paramList);
-    
+  
 #ifdef SYSLOG
-  //if(SYSLOGNAME) {
-    openlog(SYSLOGNAME, 0, LOG_USER);
-    if(ern==0)
-      syslog(LOG_ERR, "error: %s", s);
-    else    
-      syslog(LOG_ERR, "error %d: %s - %s", ern, strerror(ern), s);
-    closelog();
-  //}
+  const char* SYSLOGNAME = getenv("daemon") ? getenv("daemon") : __progname;  
+  openlog(SYSLOGNAME, 0, LOG_USER);
+  if(ern==0)
+    syslog(LOG_ERR, "error: %s", s);
+  else    
+    syslog(LOG_ERR, "error %d: %s - %s", ern, strerror(ern), s);
+  closelog();
 #else  
   if(ern==0)
     fprintf(stderr, "error: %s\n", s);
@@ -106,6 +105,7 @@ print_bin(const char* prefix, const char* s, const size_t n) {
   for(int i=0; i<n; i++) sprintf(buf+i*3, "%02X ", s[i]&0xff);
   
 #ifdef SYSLOG
+  const char* SYSLOGNAME = getenv("daemon") ? getenv("daemon") : __progname;
   openlog(SYSLOGNAME, 0, LOG_USER);
   syslog(LOG_NOTICE, "%s%s", prefix, buf);
   closelog();

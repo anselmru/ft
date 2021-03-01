@@ -1,5 +1,6 @@
 /***********************************************************************************
-                         anselm.ru [2016-10-25] GNU GPL
+*                       Класс, облегчающий работу с демоном.                       *
+*                             anselm.ru [2021-02-26]                               *
 ***********************************************************************************/
 #include "daemon.h"
 #include "log.h"
@@ -10,7 +11,6 @@
 #include <syslog.h>
 #include <strings.h>  //bzero
 
-const char* SYSLOGNAME = NULL;
 Daemon * self = NULL;  // здесь будет храниться адрес экземпляра класса
 
 void
@@ -25,7 +25,7 @@ sig(int sig, siginfo_t *siginfo, void *context) {
   }
 }
 
-Daemon::Daemon(const char* binfile, const char* conffile, const char* pidfile, bool simple_name) {
+Daemon::Daemon(const char* binfile, const char* conffile, const char* pidfile) {
   self = this;
   
   if(!binfile) {
@@ -39,17 +39,7 @@ Daemon::Daemon(const char* binfile, const char* conffile, const char* pidfile, b
     fprintf(stderr, "Error: variable environment \"config\" not defined\n");
     throw "conffile";
   }
-  CONFFILE = strdup(tmp);//strdup - обязательно!!
-  
-  if(simple_name)
-    SYSLOGNAME = strdup(APPNAME);
-  else {
-    const char *CONF = basename((char*)CONFFILE);
-    char *tmp = new char[strlen(APPNAME)+strlen(CONF)+1];
-    sprintf(tmp, "%s %s", APPNAME, CONF);
-    SYSLOGNAME = strdup(tmp);
-    delete [] tmp;
-  }
+  CONFFILE = strdup(tmp);//strdup - обязательно!!  
   
   tmp = pidfile ? pidfile : getenv("pidfile");
   if(!tmp) {
