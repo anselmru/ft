@@ -1,22 +1,22 @@
 /***********************************************************************************
-*               Класс для работы по протоколу FT1.2 поверх TCP                     *
-*                         anselm.ru [2021-02-26]                                   *
+*               Класс для работы по протоколу FT1.2 поверх UDP                     *
+*                         anselm.ru [2021-03-09]                                   *
 ***********************************************************************************/
 #pragma once
 
 #include "xml.h"
-#include "tcp.h"
+#include "udp.h"
 #include "date.h"
 
 typedef unsigned char  byte;
 typedef unsigned short word;
 
-class FT: public TCP {
+class FT: public UDP {
 public:
   FT(const Node& node);
   virtual ~FT() {}
   bool send11(word reg, byte a1, byte a2);
-  bool send19(word reg, word ii, byte q, byte a1, byte a2);
+  bool send19(word reg, byte a1, byte a2, word ii, byte q);
   bool send22(word id, word reg, byte a1, byte a2);
   bool send23(word id, word reg, byte a1, byte a2, word ii, byte q);
   
@@ -31,7 +31,7 @@ public:
   static word index_hour(Date& d, int D=32);
   static word index_day(Date& d);
 protected:
-  virtual void read(const char*, size_t);
+  virtual void read(const char*, size_t, const sockaddr_in* = NULL);
   virtual void read(word id, float val);
   int d_wait_sec;
 private:

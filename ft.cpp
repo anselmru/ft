@@ -1,6 +1,6 @@
 /***********************************************************************************
-*               Класс для работы по протоколу FT1.2 поверх TCP                     *
-*                         anselm.ru [2021-02-26]                                   *
+*               Класс для работы по протоколу FT1.2 поверх UDP                     *
+*                         anselm.ru [2021-03-09]                                   *
 ***********************************************************************************/
 
 #include "ft.h"
@@ -18,14 +18,14 @@ FT::CS(const byte* a, int i1, int i2) {
 }
 
 FT::FT(const Node& node)
-:TCP(node)
+:UDP(node)
 ,d_wait_sec(10) {
   connect();
   listen();
 }
   
 void
-FT::read(const char* msg, size_t size) { // обработка пришедшего пакета
+FT::read(const char* msg, size_t size, const sockaddr_in*) { // обработка пришедшего пакета
   print_bin2("FT::read ", msg, size);
   
   d_ans.append(msg, size);
@@ -113,7 +113,9 @@ FT::send11(word reg, byte a1, byte a2) {
         Lпар  -         длина параметра, байт (1, 2 или 4).
 *******************************************************************************/
 bool
-FT::send19(word reg, word ii, byte q, byte a1, byte a2) {
+FT::send19(word reg, byte a1, byte a2, word ii, byte q) {
+//FTsend23(word id, 
+         //word reg, byte a1, byte a2, word ii, byte q) { // получение индексированного значения параметра
   const byte P = 0x02; // номер пакета (от 1 до 7) буду использовать для идентификации команды
   //                                      4Р  А1    19  А2         NN            TT       IIмл          IIст  QQ    KC    16
   byte a[] = {0x68, 0x09, 0x09, 0x68, 0x40+P, a1, 0x19, a2, reg & 0xff, reg>>8 & 0xff, ii & 0xff, ii>>8 & 0xff,  q, 0x00, 0x16};

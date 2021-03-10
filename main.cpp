@@ -5,9 +5,10 @@
 #include "xml.h"
 #include "dev.h"
 #include "file.h"
+#include "ft.h"
 
-#define VERSION     "ft/tcp-2.1, anselm.ru [2021-03-01]"
-#define DESCRIPTION "Get data from TEKON by proto FT1.2 over TCP"
+#define VERSION     "ft/udp-2.2, anselm.ru [2021-03-10]"
+#define DESCRIPTION "Get data from TEKON by proto FT1.2 over UDP"
 #define LICENSE     "GNU GPLv3"
 #define HELP        "Usage: %s [-v|-h] [--config=file.conf] [--day=XXXX-XX-XX|--hour='XXXX-XX-XX XX:XX']\n" \
                     "Options:\n" \
@@ -49,8 +50,8 @@ main( int argc, char *argv[], char *envp[] ) {
     }
   }
   
-  //XML cfg("a.conf");
-  //Dev k(cfg);
+  //XML cfg("ft_oz.conf");
+  ///Dev k(cfg);
   //k.pass();
   //k.check_file();
   //return 0;

@@ -1,6 +1,7 @@
-/***********************************************************************************
-                         anselm.ru [2021-02-26] GNU GPLv3
-***********************************************************************************/
+/*************************************************************************
+*                        Класс для работы с TCP                          *
+*                                               anselm.ru [2021-03-10]   *
+**************************************************************************/
 #pragma once
 
 #include <netinet/in.h> //sockaddr_in
@@ -36,7 +37,7 @@ public:
   static const size_t RCVBUF   = 255;  // размер принимающего буфера по умолчанию и вычитываемая порция
 protected:
   bool send(const char*, size_t, int sock) const;
-  virtual void read(const char*, size_t);
+  virtual void read(const char*, size_t, const sockaddr_in* = NULL); // переопределяем в потомках
   void set_attr(int sock) const;
   void join();
   unsigned long long

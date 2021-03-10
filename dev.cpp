@@ -2,13 +2,13 @@
 *     Класс-обёртка над классом FT, скрывающая все особеннности протокола FT1.2.   *
 *            По сути, здесь реализовано только XML-программирование,               *
 *                       где Dev - обобщённый прибор.                               *
-*                                                         anselm.ru [2021-02-26]   *
+*                                                         anselm.ru [2021-03-10]   *
 ***********************************************************************************/
 #include "dev.h"
 #include "log.h"
 #include "date.h"
-#include "tcp.h"
 #include "file.h"
+#include "tcp.h"
 //#include <sys/types.h>
 #include <sys/stat.h>
 
@@ -76,6 +76,7 @@ Dev::Dev(Node cfg)
 
 bool
 Dev::send(int iid) {
+  debug3("Dev::send: iid=%d", iid);
   bool ret = false;
   Node &param   = d_params[iid]; //param.dump();
   string table  = param["table"].to_string();
@@ -86,6 +87,10 @@ Dev::send(int iid) {
   Date dt       = param["dt"].c_str();  // заказанное время
   
   //warning("Dev: id=%d fun=%d reg=%04X", param["id"].to_int(), fun, reg);
+  
+  //word ii = Dev::index_day(dt);      // вручную считаем точное время, которое есть в архиве прибора
+  //param["dt"] = dt.c_str(); // сразу внесём искомую дату
+  //ret = send19(reg, a1, a2, ii, 1);
   
   if(fun==22) { // получить мгновенные значения
     ret = send22(iid, reg, a1, a2);
@@ -107,7 +112,7 @@ Dev::send(int iid) {
     } 
     else if(table.find("hour")!=string::npos) {
       
-      word ii =Dev::index_hour(dt);  // вручную считаем точное время, которое есть в архиве прибора
+      word ii = Dev::index_hour(dt, param["deep"].to_int(32));  // вручную считаем точное время, которое есть в архиве прибора
       param["dt"] = dt.c_str();       // сразу внесём искомую дату
       
       if(!param["default"].blank()) {
@@ -123,7 +128,7 @@ Dev::send(int iid) {
     
   }  
   else {
-    error("bad command %d", fun);
+    //error("bad command %d", fun);
   }
   
   usleep(d_timeout_recv*1000); // надо немножко подождать между запросами
@@ -133,22 +138,24 @@ Dev::send(int iid) {
 void
 Dev::pass() { // один проход-запрос по всем параметрам с проверкой крон-даты
   Date now = Date::now();
-  
   // Цикл запросов
   Node::iterator I = d_params.begin();
-  for(; I!=d_params.end(); I++) {      
+  for(; I!=d_params.end(); I++) {
+  	
     ushort iid  = atoi(I->first.c_str());     // ид транзакции (по определению не может равняться нулю)
     Node &param = I->second;
-    if(param["id"].to_int()<=0) continue;
     
-    //if(param["fun"].to_int()==22 || param["fun"].to_int()==23) { // если мгновенные
+    if(param["id"].to_int()<=0) continue;
+    debug3("Dev::pass id=%d", param["id"].to_int());
+    //send(iid); // Для отладки можно вставить в конфиг атрибут dt="2021-03-10 10:00"
+    
     if(param["fun"].to_int()==22) { // если мгновенные
       send(iid);
     }
     else if(!param["cron"].blank() ) {
       if(param["cron_next"].blank()) { // если следующая дата ещё не вычислена
         param["cron_next"] = now.cron_next(param["cron"]).c_str();
-        warning1("Dev::pass: iid=%d id=%d cron=%s cron_next=%s", iid, param["id"].to_int(), param["cron"].c_str(), param["cron_next"].c_str());
+        debug1("Dev::pass: iid=%d id=%d cron=%s cron_next=%s", iid, param["id"].to_int(), param["cron"].c_str(), param["cron_next"].c_str());
       }
 
       Date dt = param["cron_next"].c_str();
@@ -184,11 +191,12 @@ Dev::parse() {
     Node &param = I->second;
     if(param["id"].to_int()<=0) continue;
 
-    warning1("Dev::parse: iid=%d id=%d fun=%d dt='%s' value=%lf", iid, param["id"].to_int(), param["fun"].to_int(), param["dt"].c_str(), param["value"].to_double());
+    debug1("Dev::parse: iid=%d id=%d fun=%d dt='%s' value=%lf", iid, param["id"].to_int(), param["fun"].to_int(), param["dt"].c_str(), param["value"].to_double());
         
     if(!param["dt"].blank() && !param["value"].blank()) { // если успех, то сохраняем в базу данных
       good += "\t<save id=\""  + param["id"].to_string()
-					 + "\"\tvalue=\""    + param["value"].to_string()
+					 //+ "\"\tvalue=\""    + param["value"].to_string()
+					 + "\"\tvalue=\""    + (param["koeff"].blank() ? param["value"].to_string() : std::to_string( param["value"].to_double()*param["koeff"].to_double(1) ))
 					 + "\"\tdt=\""       + param["dt"].to_string()
 					 + "\"\ttable=\""    + param["table"].to_string()
 					 + "\" />\n";
@@ -247,7 +255,7 @@ Dev::read(word iid, float val) {
   Node& param  = d_params[iid];
   param["value"] = val;
   if(param["fun"].to_int()==22) param["dt"] = Date::now().c_str();  
-  warning1("Dev::read: table=%s iid=%d reg=0x%X dt=%s value=%f", param["table"].c_str(), iid, param["reg"].to_int(), param["dt"].c_str(), val);
+  debug1("Dev::read: table=%s iid=%d reg=0x%X dt=%s value=%f", param["table"].c_str(), iid, param["reg"].to_int(), param["dt"].c_str(), val);
   //const char* dt =strdup(param["dt"].c_str());
   //warning1("Dev::read: table=%s iid=%d reg=0x%X dt=%s value=%f", param["table"].c_str(), iid, param["reg"].to_int(), dt, val);
 }
@@ -283,7 +291,7 @@ Dev::force(const char* filter) {
   // Нужно сначала завершить цикл запросов, и только потом приступать к циклу ответов.
   // Цикл запросов отделён от цикла ответов, так как запросы делаются беспорядочно.
   usleep(d_timeout_recv*1000); //подождём немножко, чтобы все ответы вернулись
-  warning1("timeout.recv=%ld", d_timeout_recv);
+  debug1("timeout.recv=%ld", d_timeout_recv);
   
   //d_params[3]["value"] = "735.1";
   //d_params[3]["dt"]    = "2015-01-16 09:00:00";
@@ -320,6 +328,7 @@ Dev::check_file() {
 
 bool
 Dev::store(const string& xml) {
+  //return true;  //TODO убрать
   //std::ofstream out("/home/max/src/bo/2.xml");
   //out.write(xml.data(), xml.size());
   //out.close();
