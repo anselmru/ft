@@ -3,7 +3,7 @@
 #                For build daemon                   #
 #                                                   #
 #####################################################
-CC      = clang
+CC      = g++
 CPP     = $(CC)
 CXX     = $(CC)
 LINK    = $(CC)
@@ -11,7 +11,7 @@ LINK    = $(CC)
 RM      = rm -f
 CFLAGS += -I/usr/local/include/libxml2 \
           -std=c++14 -std=gnu++14 \
-          -DNSYSLOG -DDEBUG=2 -DDB_DIR="\"$(DBDIR)\""
+          -DSYSLOG -DDEBUG=0 -DDB_DIR="\"$(DBDIR)\""
 LFLAGS += -L/usr/local/lib -lpthread -lstdc++ -lxml2 -lmd -lm
 BIN     = ft
 SRC     = main.cpp ft.cpp event.cpp daemon.cpp dem.cpp tcp.cpp udp.cpp xml.cpp dev.cpp date.cpp file.cpp

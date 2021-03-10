@@ -5,13 +5,13 @@
 #pragma once
 
 #include "xml.h"
-#include "udp.h"
 #include "date.h"
 
 typedef unsigned char  byte;
 typedef unsigned short word;
 
-class FT: public UDP {
+template <typename T>
+class FT: public T {
 public:
   FT(const Node& node);
   virtual ~FT() {}
@@ -31,7 +31,7 @@ public:
   static word index_hour(Date& d, int D=32);
   static word index_day(Date& d);
 protected:
-  virtual void read(const char*, size_t, const sockaddr_in* = NULL);
+  virtual void read(const char*, size_t, const void* = NULL);
   virtual void read(word id, float val);
   int d_wait_sec;
 private:

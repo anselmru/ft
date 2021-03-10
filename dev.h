@@ -9,7 +9,8 @@
 #include "xml.h"
 #include <string>
 
-class Dev: public FT
+template <typename T>
+class Dev: public FT<T>
 {
 public:
   Dev(Node);

@@ -4,11 +4,12 @@
 #include "dem.h"
 #include "xml.h"
 #include "dev.h"
-#include "file.h"
-#include "ft.h"
+#include "udp.h"
+#include "tcp.h"
+#include "log.h"
 
-#define VERSION     "ft/udp-2.2, anselm.ru [2021-03-10]"
-#define DESCRIPTION "Get data from TEKON by proto FT1.2 over UDP"
+#define VERSION     "ft-2.3, anselm.ru [2021-03-10]"
+#define DESCRIPTION "Get data from TEKON by proto FT1.2 over UDP|TCP"
 #define LICENSE     "GNU GPLv3"
 #define HELP        "Usage: %s [-v|-h] [--config=file.conf] [--day=XXXX-XX-XX|--hour='XXXX-XX-XX XX:XX']\n" \
                     "Options:\n" \
@@ -51,18 +52,31 @@ main( int argc, char *argv[], char *envp[] ) {
   }
   
   //XML cfg("ft_oz.conf");
-  ///Dev k(cfg);
+  //Dev<UDP> k(cfg);
   //k.pass();
+  //void* a = &k; static_cast< Dev<UDP>* >(a)->pass();
   //k.check_file();
   //return 0;
   
   if(FILTER && CONFFILE) {
     XML cfg(CONFFILE);
-		Dev k(cfg);
-		k.force(FILTER);    
+  
+    const char* proto = cfg["dev"]["sock"]["proto"].strdup(); 
+    if( strcmp("udp", proto)==0 ) {
+      Dev<UDP> k(cfg);
+      k.force(FILTER);
+    }
+    else if( strcmp("tcp", proto)==0 ) {      
+      Dev<TCP> k(cfg);
+      k.force(FILTER);
+    }
+    else {
+      fprintf( stderr, "Unexpected proto = %s\n", proto);
+    }
     return 0;
   }      
-  
+
+  debug1("debug level = %d", DEBUG);
   Dem d(APPNAME, CONFFILE, PIDFILE);
   d.start();
   return 0;

@@ -512,7 +512,7 @@ TCP::recv(int sock) {
 }
 
 void
-TCP::read(const char* msg, size_t, const sockaddr_in*) {
+TCP::read(const char* msg, size_t, const void*) {
   warning3("debug: msg=%s", msg);
 }
 

@@ -9,13 +9,17 @@
 #include "date.h"
 #include "file.h"
 #include "tcp.h"
-//#include <sys/types.h>
+#include "udp.h"
 #include <sys/stat.h>
 
-#define DB_PATTERN "*.xml"
+//https://stackoverflow.com/questions/8752837/undefined-reference-to-template-class-constructor
+template class Dev<UDP>; // создадим экземпляр UDP
+template class Dev<TCP>; // создадим экземпляр TCP
 
-Dev::Dev(Node cfg)
-: FT(cfg["dev"]["sock"])
+
+template <typename T>
+Dev<T>::Dev(Node cfg)
+: FT<T>(cfg["dev"]["sock"])
 , d_timeout_recv(cfg["timeout"]["recv"].to_long(1000)) {
   // Подготовим список запрашиваемых параметров
   int iid=0;
@@ -74,9 +78,10 @@ Dev::Dev(Node cfg)
   }
 }
 
+template <typename T>
 bool
-Dev::send(int iid) {
-  debug3("Dev::send: iid=%d", iid);
+Dev<T>::send(int iid) {
+  debug3("Dev::send iid=%d", iid);
   bool ret = false;
   Node &param   = d_params[iid]; //param.dump();
   string table  = param["table"].to_string();
@@ -88,18 +93,18 @@ Dev::send(int iid) {
   
   //warning("Dev: id=%d fun=%d reg=%04X", param["id"].to_int(), fun, reg);
   
-  //word ii = Dev::index_day(dt);      // вручную считаем точное время, которое есть в архиве прибора
+  //word ii = Dev<T>::index_day(dt);      // вручную считаем точное время, которое есть в архиве прибора
   //param["dt"] = dt.c_str(); // сразу внесём искомую дату
   //ret = send19(reg, a1, a2, ii, 1);
   
   if(fun==22) { // получить мгновенные значения
-    ret = send22(iid, reg, a1, a2);
+    ret = FT<T>::send22(iid, reg, a1, a2);
   }
   else if(fun==23) { // получить архивные значения
   
     if(table.find("day")!=string::npos) { // суточный архив
       
-      word ii = Dev::index_day(dt);      // вручную считаем точное время, которое есть в архиве прибора
+      word ii = Dev<T>::index_day(dt);      // вручную считаем точное время, которое есть в архиве прибора
       param["dt"] = dt.c_str(); // сразу внесём искомую дату
       
       if(!param["default"].blank()) {   // может статься, что прибор в ремонте - и это нормально  
@@ -107,12 +112,12 @@ Dev::send(int iid) {
         ret = true;
       }
       else
-        ret = send23(iid, reg, a1, a2, ii, 1);
+        ret = FT<T>::send23(iid, reg, a1, a2, ii, 1);
 
     } 
     else if(table.find("hour")!=string::npos) {
       
-      word ii = Dev::index_hour(dt, param["deep"].to_int(32));  // вручную считаем точное время, которое есть в архиве прибора
+      word ii = Dev<T>::index_hour(dt, param["deep"].to_int(32));  // вручную считаем точное время, которое есть в архиве прибора
       param["dt"] = dt.c_str();       // сразу внесём искомую дату
       
       if(!param["default"].blank()) {
@@ -120,7 +125,7 @@ Dev::send(int iid) {
         ret = true;
       }
       else
-        ret = send23(iid, reg, a1, a2, ii, 1);
+        ret = FT<T>::send23(iid, reg, a1, a2, ii, 1);
     }
     else {
       error("bad table %s", table.c_str());
@@ -135,13 +140,14 @@ Dev::send(int iid) {
   return ret;
 }
 
+template <typename T>
 void
-Dev::pass() { // один проход-запрос по всем параметрам с проверкой крон-даты
+Dev<T>::pass() { // один проход-запрос по всем параметрам с проверкой крон-даты
   Date now = Date::now();
   // Цикл запросов
   Node::iterator I = d_params.begin();
   for(; I!=d_params.end(); I++) {
-  	
+    
     ushort iid  = atoi(I->first.c_str());     // ид транзакции (по определению не может равняться нулю)
     Node &param = I->second;
     
@@ -155,7 +161,7 @@ Dev::pass() { // один проход-запрос по всем парамет
     else if(!param["cron"].blank() ) {
       if(param["cron_next"].blank()) { // если следующая дата ещё не вычислена
         param["cron_next"] = now.cron_next(param["cron"]).c_str();
-        debug1("Dev::pass: iid=%d id=%d cron=%s cron_next=%s", iid, param["id"].to_int(), param["cron"].c_str(), param["cron_next"].c_str());
+        debug2("Dev::pass iid=%d id=%d cron=%s cron_next=%s", iid, param["id"].to_int(), param["cron"].c_str(), param["cron_next"].c_str());
       }
 
       Date dt = param["cron_next"].c_str();
@@ -178,8 +184,9 @@ Dev::pass() { // один проход-запрос по всем парамет
   parse(); // сканируем ответы
 }
 
+template <typename T>
 void
-Dev::parse() {
+Dev<T>::parse() {
   struct stat buf = {0};
   bool has_stdout = 0==fstat(1, &buf); // имеется ли стандартный выход, т.е. запускаем ли вручную
   
@@ -191,21 +198,21 @@ Dev::parse() {
     Node &param = I->second;
     if(param["id"].to_int()<=0) continue;
 
-    debug1("Dev::parse: iid=%d id=%d fun=%d dt='%s' value=%lf", iid, param["id"].to_int(), param["fun"].to_int(), param["dt"].c_str(), param["value"].to_double());
+    debug2("Dev::parse iid=%d id=%d fun=%d dt='%s' value=%lf", iid, param["id"].to_int(), param["fun"].to_int(), param["dt"].c_str(), param["value"].to_double());
         
     if(!param["dt"].blank() && !param["value"].blank()) { // если успех, то сохраняем в базу данных
       good += "\t<save id=\""  + param["id"].to_string()
-					 //+ "\"\tvalue=\""    + param["value"].to_string()
-					 + "\"\tvalue=\""    + (param["koeff"].blank() ? param["value"].to_string() : std::to_string( param["value"].to_double()*param["koeff"].to_double(1) ))
-					 + "\"\tdt=\""       + param["dt"].to_string()
-					 + "\"\ttable=\""    + param["table"].to_string()
-					 + "\" />\n";
+           //+ "\"\tvalue=\""    + param["value"].to_string()
+           + "\"\tvalue=\""    + (param["koeff"].blank() ? param["value"].to_string() : std::to_string( param["value"].to_double()*param["koeff"].to_double(1) ))
+           + "\"\tdt=\""       + param["dt"].to_string()
+           + "\"\ttable=\""    + param["table"].to_string()
+           + "\" />\n";
     }
     
     /* Для имитации bad и проверки работоспособности check_file:
     if(param["fun"].to_int()==23) {
-    	param["dt"]    = "2021-02-25";
-    	param["value"] = "";
+      param["dt"]    = "2021-02-25";
+      param["value"] = "";
     }*/
     
     if(param["fun"].to_int()==23 && !param["dt"].blank() && param["value"].blank()) { // если неудача, то сохраняем в файл
@@ -232,8 +239,8 @@ Dev::parse() {
     good = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE qscada>\n<root>\n" + good + "</root>\n";
     store(good);
     if(has_stdout) {
-			printf("--------good--------\n");
-			printf("%s\n", good.c_str());
+      printf("--------good--------\n");
+      printf("%s\n", good.c_str());
     }
   }
   
@@ -241,27 +248,29 @@ Dev::parse() {
     bad = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE qscada>\n<root>\n" + bad + "</root>\n";
     File(DB_DIR) << bad; // в любом режиме
     if(has_stdout) {  // в ручном режиме
-			printf("--------bad---------\n");
-			printf("%s\n", bad.c_str());
+      printf("--------bad---------\n");
+      printf("%s\n", bad.c_str());
     }
     else {
-    	//File(DB_DIR) << bad; // только в демоническом режиме
+      //File(DB_DIR) << bad; // только в демоническом режиме
     }
   }
 }
 
+template <typename T>
 void
-Dev::read(word iid, float val) {
+Dev<T>::read(word iid, float val) {
   Node& param  = d_params[iid];
   param["value"] = val;
   if(param["fun"].to_int()==22) param["dt"] = Date::now().c_str();  
-  debug1("Dev::read: table=%s iid=%d reg=0x%X dt=%s value=%f", param["table"].c_str(), iid, param["reg"].to_int(), param["dt"].c_str(), val);
+  debug2("Dev::read table=%s iid=%d reg=0x%X dt=%s value=%f", param["table"].c_str(), iid, param["reg"].to_int(), param["dt"].c_str(), val);
   //const char* dt =strdup(param["dt"].c_str());
-  //warning1("Dev::read: table=%s iid=%d reg=0x%X dt=%s value=%f", param["table"].c_str(), iid, param["reg"].to_int(), dt, val);
+  //warning1("Dev<T>::read: table=%s iid=%d reg=0x%X dt=%s value=%f", param["table"].c_str(), iid, param["reg"].to_int(), dt, val);
 }
 
+template <typename T>
 void // принудительный запрос по всем параметрам, у которых стоит атрибут dt, либо если аргумент a!=NULL
-Dev::force(const char* filter) { 
+Dev<T>::force(const char* filter) { 
   // Цикл запросов
   Node::iterator I = d_params.begin();
   for(; I!=d_params.end(); I++) {      
@@ -299,8 +308,9 @@ Dev::force(const char* filter) {
   parse(); // сканируем ответы
 }
 
+template <typename T>
 void
-Dev::check_file() {
+Dev<T>::check_file() {
   File f(DB_DIR);
   
   if(!f.find()) return;
@@ -326,8 +336,9 @@ Dev::check_file() {
   d_params = bak;
 }
 
+template <typename T>
 bool
-Dev::store(const string& xml) {
+Dev<T>::store(const string& xml) {
   //return true;  //TODO убрать
   //std::ofstream out("/home/max/src/bo/2.xml");
   //out.write(xml.data(), xml.size());
@@ -343,7 +354,7 @@ Dev::store(const string& xml) {
     tcp->sndtimeo(sock["sndtimeo"].to_int());
     tcp->rcvtimeo(sock["rcvtimeo"].to_int());
     //tcp->rcvbuf(p["rcvbuf"].to_int());
-    //debug3("Dev::store: %s", xml.c_str());
+    //debug3("Dev<T>::store: %s", xml.c_str());
     if( !tcp->connect(sock["host"].c_str(), sock["port"].to_int()) || !tcp->send(xml.c_str(), xml.size()) ) { //отправка на сервер
       ret = false; // если хотя бы одна неудачная отсылка, то фу-ю считаем неудачной
       error("send to %s:%d", sock["host"].c_str(), sock["port"].to_int());

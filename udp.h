@@ -28,7 +28,7 @@ public:
   static const size_t CNNTIMEO = 3000; // время соединения по умолчанию
   static const size_t RCVBUF   = 255;  // размер принимающего буфера по умолчанию и вычитываемая порция
 protected:
-  virtual void read(const char*, size_t, const sockaddr_in* = NULL); // переопределяем в потомках
+  virtual void read(const char*, size_t, const void* a_sockaddr_in = NULL); // переопределяем в потомках
   //virtual void read(const char*, size_t);
 private:  
   bool send(const char*, size_t, sockaddr_in);

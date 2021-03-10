@@ -37,7 +37,7 @@ public:
   static const size_t RCVBUF   = 255;  // размер принимающего буфера по умолчанию и вычитываемая порция
 protected:
   bool send(const char*, size_t, int sock) const;
-  virtual void read(const char*, size_t, const sockaddr_in* = NULL); // переопределяем в потомках
+  virtual void read(const char*, size_t, const void* a_sockaddr_in = NULL); // переопределяем в потомках
   void set_attr(int sock) const;
   void join();
   unsigned long long

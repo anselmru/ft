@@ -1,15 +1,22 @@
 /***********************************************************************************
-*               Класс для работы по протоколу FT1.2 поверх UDP                     *
-*                         anselm.ru [2021-03-09]                                   *
+*               Класс для работы по протоколу FT1.2 поверх UDP|TCP                 *
+*                            anselm.ru [2021-03-10]                                *
 ***********************************************************************************/
 
 #include "ft.h"
+#include "log.h"
+#include "udp.h"
+#include "tcp.h"
 #include <stdarg.h>
 #include <errno.h>
-#include "log.h"
 
+//https://stackoverflow.com/questions/8752837/undefined-reference-to-template-class-constructor
+template class FT<UDP>; // создадим экземпляр UDP
+template class FT<TCP>; // создадим экземпляр TCP
+
+template <typename T>
 byte
-FT::CS(const byte* a, int i1, int i2) {
+FT<T>::CS(const byte* a, int i1, int i2) {
   byte b = 0;
   for(int i=i1; i<i2; i++) {
     b = (b + a[i]) % 256;// & 0xff;
@@ -17,15 +24,17 @@ FT::CS(const byte* a, int i1, int i2) {
   return b;//&0xff;
 }
 
-FT::FT(const Node& node)
-:UDP(node)
+template <typename T>
+FT<T>::FT(const Node& node)
+:T(node)
 ,d_wait_sec(10) {
-  connect();
-  listen();
+  T::connect();
+  T::listen();
 }
-  
+
+template <typename T>
 void
-FT::read(const char* msg, size_t size, const sockaddr_in*) { // обработка пришедшего пакета
+FT<T>::read(const char* msg, size_t size, const void*) { // обработка пришедшего пакета
   print_bin2("FT::read ", msg, size);
   
   d_ans.append(msg, size);
@@ -74,15 +83,16 @@ FT::read(const char* msg, size_t size, const sockaddr_in*) { // обработк
           КС     -        контрольная сумма
           ХХо .. ХХn      значение параметра
 *******************************************************************************/
+template <typename T>
 bool
-FT::send11(word reg, byte a1, byte a2) {
+FT<T>::send11(word reg, byte a1, byte a2) {
   const byte P = 0x01; // номер пакета (от 1 до 7) буду использовать для идентификации команды
   byte a[] = {0x10, 0x40+P, a1, 0x11, a2, reg & 0xff, reg>>8 & 0xff, 0x00, 0x16};
   a[7] = CS(a, 1, 7);
   
   print_bin2("FT::send11 ", (const char*)a, sizeof(a));
   
-  return send((const char*)a, sizeof(a));
+  return T::send((const char*)a, sizeof(a));
 }
 
 /*******************************************************************************
@@ -112,8 +122,9 @@ FT::send11(word reg, byte a1, byte a2) {
         LL=QQ*Lпар + 2  длина ответного сообщения при QQ>1;
         Lпар  -         длина параметра, байт (1, 2 или 4).
 *******************************************************************************/
+template <typename T>
 bool
-FT::send19(word reg, byte a1, byte a2, word ii, byte q) {
+FT<T>::send19(word reg, byte a1, byte a2, word ii, byte q) {
 //FTsend23(word id, 
          //word reg, byte a1, byte a2, word ii, byte q) { // получение индексированного значения параметра
   const byte P = 0x02; // номер пакета (от 1 до 7) буду использовать для идентификации команды
@@ -123,11 +134,12 @@ FT::send19(word reg, byte a1, byte a2, word ii, byte q) {
   
   print_bin2("FT::send19 ", (const char*)a, sizeof(a));
   
-  return send((const char*)a, sizeof(a));
+  return T::send((const char*)a, sizeof(a));
 }
 
+template <typename T>
 bool
-FT::send22(word id, word reg, byte a1, byte a2) { // получение мгновенное значение параметра
+FT<T>::send22(word id, word reg, byte a1, byte a2) { // получение мгновенное значение параметра
   const byte P = 0x03; // номер пакета (от 1 до 7) буду использовать для идентификации команды
   //                                      4Р    А1    19  А2          NN            TT        IDмл          IDст    KC    16
   byte a[] =   {0x68, 0x08, 0x08, 0x68, 0x40+P, a1, 0x22, a2, reg & 0xff, reg>>8 & 0xff, id & 0xff, id>>8 & 0xff, 0x00, 0x16};
@@ -138,11 +150,12 @@ FT::send22(word id, word reg, byte a1, byte a2) { // получение мгно
   
   print_bin2("FT::send22 ", (const char*)a, sizeof(a));
   
-  return send((const char*)a, sizeof(a));
+  return T::send((const char*)a, sizeof(a));
 }
 
+template <typename T>
 bool
-FT::recv22(const byte* a) {   // мгновенное значение параметра
+FT<T>::recv22(const byte* a) {   // мгновенное значение параметра
   size_t size = a[1]&0xff;    // размер полезных данных - с 4 до контрольной суммы
   
   word id=0;
@@ -156,8 +169,9 @@ FT::recv22(const byte* a) {   // мгновенное значение пара�
   return true;
 }
 
+template <typename T>
 bool
-FT::send23(word id, word reg, byte a1, byte a2, word ii, byte q) { // получение индексированного значения параметра
+FT<T>::send23(word id, word reg, byte a1, byte a2, word ii, byte q) { // получение индексированного значения параметра
   const byte P = 0x04; // номер пакета (от 1 до 7) буду использовать для идентификации команды
   //                                      4Р    А1    19  А2         NN            TT         IIмл          IIст QQ       IDмл          IDст    KC    16
   byte a[] =   {0x68, 0x0B, 0x0B, 0x68, 0x40+P, a1, 0x23, a2, reg & 0xff, reg>>8 & 0xff, ii & 0xff, ii>>8 & 0xff, q, id & 0xff, id>>8 & 0xff, 0x00, 0x16};
@@ -168,11 +182,12 @@ FT::send23(word id, word reg, byte a1, byte a2, word ii, byte q) { // получ
   
   print_bin2("FT::send23 ", (const char*)a, sizeof(a));
                                                                                           
-  return send((const char*)a, sizeof(a));
+  return T::send((const char*)a, sizeof(a));
 }
 
+template <typename T>
 bool
-FT::recv23(const byte* a) { // мгновенное значение параметра
+FT<T>::recv23(const byte* a) { // мгновенное значение параметра
   size_t size = a[1]&0xff;    // размер полезных данных - с 4 до контрольной суммы
   
   word id=0;
@@ -187,9 +202,9 @@ FT::recv23(const byte* a) { // мгновенное значение парам�
   return true;
 }
 
-
+template <typename T>
 word
-FT::index_hour(Date& d, int D) { //D - количество дней - глубина часового архива  
+FT<T>::index_hour(Date& d, int D) { //D - количество дней - глубина часового архива  
   //int G = dt.year()-2000; // количество лет с 2000 года 
   //int N = 365*G + int(G/4) + dt.yday()-1; // количество дней с 2000 года
   //int D = 64;// количество дней - глубина часового архива 1536(0-1535) часов                
@@ -201,8 +216,9 @@ FT::index_hour(Date& d, int D) { //D - количество дней - глуб�
   return ii;
 }
 
+template <typename T>
 word
-FT::index_day(Date& d) {
+FT<T>::index_day(Date& d) {
   Date today = Date::now().trunc(Date::MDAY);
   d = d.trunc(Date::MDAY);
   if(today==d) { // если дата за сегодня,
@@ -215,14 +231,15 @@ FT::index_day(Date& d) {
   return ii;
 }
 
+template <typename T>
 void
-FT::read(word id, float f) { // перегружаемая
-  warning2("FT::read: %02x=%f\n", id, f);
+FT<T>::read(word id, float f) { // перегружаемая
+  warning2("FT::read %02x=%f\n", id, f);
 }
 
-
+template <typename T>
 bool
-FT::recv11() {  
+FT<T>::recv11() {  
   const int L = d_ans[1]+6; // ожидаемая длина ответа
     
   if(d_ans.size()<L) { // неправильная длина ответа
@@ -282,8 +299,9 @@ FT::recv11() {
   return true;
 }
 
+template <typename T>
 bool
-FT::recv19() {
+FT<T>::recv19() {
   const int L = d_ans[1]+6; // ожидаемая длина ответа
     
   if(d_ans.size()<L ) { // неправильная длина ответа
@@ -356,8 +374,9 @@ FT::recv19() {
   return true;  
 }
 
+template <typename T>
 bool
-FT::wait(int sec) const { // ожидаем, пока функции recv не вернут истину или не выйдет таймаут
+FT<T>::wait(int sec) const { // ожидаем, пока функции recv не вернут истину или не выйдет таймаут
   time_t t = time(NULL)+sec;
   while(time(NULL)<t) {
     if(d_ret_bool) return true;
@@ -367,8 +386,9 @@ FT::wait(int sec) const { // ожидаем, пока функции recv не �
   return false;
 }
 
+template <typename T>
 bool
-FT::get(Node& p) {
+FT<T>::get(Node& p) {
   p["success"] = d_ret_bool  = false;  // сбрасывем первоначальное состояние возвращённое функциями recv
   p["value"  ] = d_ret_float = 0.0;    // сбрасывем значение
   
@@ -408,4 +428,3 @@ FT::get(Node& p) {
   sleep(1);
   return ret;
 }
-

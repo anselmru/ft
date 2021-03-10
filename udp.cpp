@@ -108,15 +108,14 @@ UDP::listen() {
 
   evt.wait(); // надо дать время запуститься потоку (и заполнить ид потока d_thread_read)
   
-  debug3("UDP::listen: start thread %d", d_thread_read);
+  debug3("UDP::listen start thread %d", d_thread_read);
   
   return d_thread_read!=0;
 }
 
 bool
 UDP::send(const char *msg, size_t size, sockaddr_in to) {
-  warning3("print_bin size=%d", size);
-  print_bin3("debug: send ", msg, size);
+  print_bin3("UDP::send ", msg, size);
   
   if(size<=0) {
     size = strlen((char*)msg);
@@ -145,6 +144,7 @@ UDP::recv(timeval *tv) {
     res = false;
   }
   else {
+    debug3("UDP::recv succes");
     const size_t MIN_SIZE = 10;
     size_t buf_size  = MIN_SIZE; // начальный размер буфера
     size_t data_size = 0;        // надо найти полный размер датаграммы
@@ -182,8 +182,8 @@ UDP::recv(timeval *tv) {
 }
 
 void
-UDP::read(const char* msg, size_t, const sockaddr_in*) {
-  warning3("UDP::read: msg=%s", msg);
+UDP::read(const char* msg, size_t, const void*) {
+  warning3("UDP::read  <-- override this");
 }
 
 sockaddr_in
