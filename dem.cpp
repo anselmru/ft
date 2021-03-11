@@ -31,6 +31,18 @@ Dem::childloop() {
   else if( strcmp("tcp", proto)==0 ) {      
     Dev<TCP> k(cfg);
     while(1) {
+    	if(!k.connected()) {
+    		warning("disconnected, attempt to reconnect after %dmsec", rate);
+    		if(wait(rate)) break;// чутко спим
+    		bool cool = k.connect();
+    		if(cool)
+      		warning("connection restored");
+      	else {
+      		warning("connection faild");
+      		if(wait(rate)) break;// чутко спим
+      		continue;
+      	}
+    	}
       k.check_file();
       if(wait(rate)) break;// чутко спим
       k.pass();
