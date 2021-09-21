@@ -261,9 +261,23 @@ template <typename T>
 void
 Dev<T>::read(word iid, float val) {
   Node& param  = d_params[iid];
-  param["value"] = val;
-  if(param["fun"].to_int()==22) param["dt"] = Date::now().c_str();  
+  if(param["type"]=="bool") {
+	char a[4] = {0};
+	memcpy(a, &val, 4);
+	param["value"] = a[0];
+	//warning("iid=%d value=[%0x %0x %0x %0x] id=%d int=%d", iid, a[0]&0xf, a[1]&0xf, a[2]&0xf, a[3]&0xf, param["id"].to_int(), param["value"].to_int() );
+  }
+  else {
+    param["value"] = val;
+  }
+  if(param["fun"].to_int()==22) param["dt"] = Date::now().c_str();
   debug2("Dev::read table=%s iid=%d reg=0x%X dt=%s value=%f", param["table"].c_str(), iid, param["reg"].to_int(), param["dt"].c_str(), val);
+  //char a[4] = {0};
+  //int i = 0;
+  //memcpy(a, &val, 4);
+  //memcpy(&i, &val, 4);
+  //warning("iid=%d value=[%0x %0x %0x %0x] id=%d int=%d", iid, a[0]&0xf, a[1]&0xf, a[2]&0xf, a[3]&0xf, param["id"].to_int(), i );
+  
   //const char* dt =strdup(param["dt"].c_str());
   //warning1("Dev<T>::read: table=%s iid=%d reg=0x%X dt=%s value=%f", param["table"].c_str(), iid, param["reg"].to_int(), dt, val);
 }

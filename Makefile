@@ -41,6 +41,7 @@ rebuild: clean all
 #                                                   #
 #####################################################
 RC      = ft_ppv
+RC     += ft_oz
 BINDIR  = /usr/local/bin
 ETCDIR  = /usr/local/etc
 RCDIR   = /usr/local/etc/rc.d

@@ -28,23 +28,25 @@ Dem::childloop() {
       sleep(1); // против зацикливания
     }
   }
-  else if( strcmp("tcp", proto)==0 ) {      
+  else if( strcmp("tcp", proto)==0 ) {
     Dev<TCP> k(cfg);
     while(1) {
-    	if(!k.connected()) {
-    		warning("disconnected, attempt to reconnect after %dmsec", rate);
-    		if(wait(rate)) break;// чутко спим
-    		bool cool = k.connect();
-    		if(cool)
-      		warning("connection restored");
-      	else {
-      		warning("connection faild");
-      		if(wait(rate)) break;// чутко спим
-      		continue;
-      	}
-    	}
-      k.check_file();
+      if(!k.connected()) {
+        warning("disconnected, attempt to reconnect after %d msec", rate);
+        if(wait(rate)) break;// чутко спим
+        sleep(1);
+        bool cool = k.connect();
+        if(cool)
+          warning("connection restored");
+        else {
+          warning("connection faild");
+          if(wait(rate)) break;// чутко спим
+          sleep(1);
+          continue;
+        }
+      }
       if(wait(rate)) break;// чутко спим
+      k.check_file();
       k.pass();
       sleep(1); // против зацикливания
     }

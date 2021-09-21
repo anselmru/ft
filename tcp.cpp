@@ -109,9 +109,11 @@ thread_event(void *a) {// ожидание события в дочернем п
     
     if(ufds[0].revents & POLLHUP || ufds[0].revents & POLLNVAL ) {  // плохое событие на главном сокете   POLLHUP="положили трубку"
       //warning3("POLLIN & POLLNVAL & 0x%X", ufds[0].revents);
-      error3("TCP::thread_event main socket %d error 0x%X", ufds[0].fd, ufds[0].revents); //EBADF 9 Bad file descriptor
+      error("TCP::thread_event main socket %d error 0x%X", ufds[0].fd, ufds[0].revents); //EBADF 9 Bad file descriptor
       //TODO tcp->close_main_socket(); // здесь присваевается d_sock=-1
-      tcp->disconnect(); // сокет не уничтожаем, а просто разъединяем
+      //TODO tcp->disconnect(); // сокет не уничтожаем, а просто разъединяем
+      tcp->d_is_connect = false; // не нужно создавать здесь новых событий на сокете
+      sleep(1);
     }
     
     for(int i=1; i<nfds; i++) { // вначале обработаем ВСЕ клиентские сокеты
@@ -336,7 +338,7 @@ void
 TCP::disconnect() {
   //close_main_socket(); // всегда считал, что отсоединение сокета равносильно его разрушению, - может я не прав?? я был не прав - переподключаться можно!!
   if(d_sock>=0) {
-    if(shutdown(d_sock, SHUT_RDWR)==-1) error("shutdown main socket %d", d_sock); //SHUT_RDWR=2
+    if(shutdown(d_sock, SHUT_RDWR)==-1) error("TCP::disconnect shutdown main socket %d", d_sock); //SHUT_RDWR=2
     warning3("TCP::disconnect shutdown main socket %d", d_sock);
   }
   d_is_connect = false;
